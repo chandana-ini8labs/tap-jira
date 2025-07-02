@@ -3214,8 +3214,11 @@ class IssueWorklogs(JiraStream):
                 Property("active", BooleanType),
             ),
         ),
+        Property("comment", ADFRootBlockNode), 
+        Property("created", DateTimeType),
         Property("updated", DateTimeType),
         Property("started", DateTimeType),
+        Property("timeSpent", StringType),
         Property("timeSpentSeconds", IntegerType),
         Property("issueId", StringType),
     ).to_dict()
