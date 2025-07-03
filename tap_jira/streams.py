@@ -2334,6 +2334,7 @@ class BoardStream(JiraStream):
                 Property("name", StringType),
             ),
         ),
+        Property("isPrivate", BooleanType),
     ).to_dict()
 
     @property
