@@ -3252,7 +3252,7 @@ class DeletedWorklogs(JiraStream):
     primary_keys = ("worklogId",)
     replication_key = "updatedTime"
     records_jsonpath = "$.values[*]"
-    next_page_token_jsonpath = None  # type: ignore[assignment]
+    next_page_token_jsonpath = "$.nextPage"
 
     schema = PropertiesList(
         Property("worklogId", IntegerType),
@@ -3264,12 +3264,36 @@ class DeletedWorklogs(JiraStream):
         """Return URL params with 'since' in milliseconds."""
         params = {}
 
-        # Convert start_date (ISO 8601) to UNIX timestamp in milliseconds
-        if "start_date" in self.config:
-            start_date = self.config["start_date"]
-            since = int(start_date.timestamp() * 1000)
+        # If we have a next page token, extract 'since' directly from it
+        if next_page_token:
+            # next_page_token is a URL like:
+            # https://thedatacooks.atlassian.net/rest/api/3/worklog/deleted?since=1750616817118
+            from urllib.parse import urlparse, parse_qs
+
+            parsed = urlparse(next_page_token)
+            since = parse_qs(parsed.query).get("since", [0])[0]
             params["since"] = since
         else:
-            params["since"] = 0
+            # Use configured start_date or default to 0
+            if "start_date" in self.config:
+                import datetime
+
+                start_date = self.config["start_date"]
+                # If start_date is string (e.g., "2024-01-01T00:00:00Z"), parse it
+                if isinstance(start_date, str):
+                    from dateutil.parser import parse
+
+                    start_date = parse(start_date)
+                since = int(start_date.timestamp() * 1000)
+                params["since"] = since
+            else:
+                params["since"] = 0
 
         return params
+
+    def get_next_page_token(self, response, previous_token):
+        """Extract next page token (URL) if available."""
+        data = response.json()
+        if data.get("lastPage") is False and "nextPage" in data:
+            return data["nextPage"]
+        return None
