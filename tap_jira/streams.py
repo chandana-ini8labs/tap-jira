@@ -3265,9 +3265,11 @@ class DeletedWorklogs(JiraStream):
         params = {}
 
         # Convert start_date (ISO 8601) to UNIX timestamp in milliseconds
-        if self.get_starting_timestamp(context):
-            start_date = self.get_starting_timestamp(context)
+        if "start_date" in self.config:
+            start_date = self.config["start_date"]
             since = int(start_date.timestamp() * 1000)
             params["since"] = since
+        else:
+            params["since"] = 0
 
         return params
