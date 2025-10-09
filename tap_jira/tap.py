@@ -126,6 +126,7 @@ class TapJira(Tap):
             streams.BoardStream(self),
             streams.IssueWatchersStream(self),
             streams.IssueWorklogs(self),
+            streams.DeletedWorklogs(self),
         ]
 
         if self.config.get("include_audit_logs", False):

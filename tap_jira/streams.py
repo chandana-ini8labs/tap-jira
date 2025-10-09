@@ -1709,7 +1709,9 @@ class IssueStream(JiraStream):
 
         return params
 
-    def post_process(self, row: Record, context: Context | None = None) -> Record:  # noqa: ARG002
+    def post_process(
+        self, row: Record, context: Context | None = None
+    ) -> Record:  # noqa: ARG002
         """Post-process the record.
 
         - Add top-level `created` field.
@@ -1718,7 +1720,9 @@ class IssueStream(JiraStream):
         row["created"] = created
         return row
 
-    def get_child_context(self, record: dict, context: dict | None) -> dict:  # noqa: ARG002
+    def get_child_context(
+        self, record: dict, context: dict | None
+    ) -> dict:  # noqa: ARG002
         """Return a context dictionary for child streams."""
         return {"issue_id": record["id"]}
 
@@ -2352,7 +2356,9 @@ class BoardStream(JiraStream):
         domain = self.config["domain"]
         return f"https://{domain}:443/rest/agile/1.0"
 
-    def get_child_context(self, record: dict, context: dict | None) -> dict:  # noqa: ARG002
+    def get_child_context(
+        self, record: dict, context: dict | None
+    ) -> dict:  # noqa: ARG002
         """Return a context dictionary for child streams."""
         return {"board_id": record["id"]}
 
@@ -3224,7 +3230,7 @@ class IssueWorklogs(JiraStream):
                 Property("active", BooleanType),
             ),
         ),
-        Property("comment", ADFRootBlockNode), 
+        Property("comment", ADFRootBlockNode),
         Property("created", DateTimeType),
         Property("updated", DateTimeType),
         Property("started", DateTimeType),
@@ -3232,3 +3238,36 @@ class IssueWorklogs(JiraStream):
         Property("timeSpentSeconds", IntegerType),
         Property("issueId", StringType),
     ).to_dict()
+
+
+class DeletedWorklogs(JiraStream):
+    """Deleted Worklogs.
+
+    https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-worklogs/#api-rest-api-3-worklog-deleted-get
+    """
+
+    name = "deleted_worklogs"
+    path = "/worklog/deleted"
+
+    primary_keys = ("worklogId",)
+    replication_key = "updatedTime"
+    records_jsonpath = "$.values[*]"
+    next_page_token_jsonpath = None  # type: ignore[assignment]
+
+    schema = PropertiesList(
+        Property("worklogId", IntegerType),
+        Property("updatedTime", IntegerType),
+        Property("properties", ArrayType(ObjectType())),
+    ).to_dict()
+
+    def get_url_params(self, context, next_page_token):
+        """Return URL params with 'since' in milliseconds."""
+        params = {}
+
+        # Convert start_date (ISO 8601) to UNIX timestamp in milliseconds
+        if self.get_starting_timestamp(context):
+            start_date = self.get_starting_timestamp(context)
+            since = int(start_date.timestamp() * 1000)
+            params["since"] = since
+
+        return params
