@@ -11,6 +11,7 @@ from singer_sdk import typing as th  # JSON Schema typing helpers
 from singer_sdk.pagination import JSONPathPaginator
 
 from tap_jira.client import JiraStream
+from datetime import datetime
 
 if t.TYPE_CHECKING:
     import requests
@@ -3264,30 +3265,31 @@ class DeletedWorklogs(JiraStream):
         """Return URL params with 'since' in milliseconds."""
         params = {}
 
-        # If we have a next page token, extract 'since' directly from it
         if next_page_token:
-            # next_page_token is a URL like:
-            # https://thedatacooks.atlassian.net/rest/api/3/worklog/deleted?since=1750616817118
+            # Extract 'since' directly from the nextPage URL
             from urllib.parse import urlparse, parse_qs
 
             parsed = urlparse(next_page_token)
             since = parse_qs(parsed.query).get("since", [0])[0]
             params["since"] = since
         else:
-            # Use configured start_date or default to 0
-            if "start_date" in self.config:
-                import datetime
-
-                start_date = self.config["start_date"]
-                # If start_date is string (e.g., "2024-01-01T00:00:00Z"), parse it
+            # Use start_date config if provided
+            start_date = self.config.get("start_date")
+            if start_date:
                 if isinstance(start_date, str):
-                    from dateutil.parser import parse
-
-                    start_date = parse(start_date)
+                    # Handle ISO-like string: "2024-01-01T00:00:00Z"
+                    try:
+                        # Remove 'Z' if present and parse manually
+                        start_date = start_date.replace("Z", "")
+                        start_date = datetime.fromisoformat(start_date)
+                    except ValueError:
+                        # If parsing fails, fallback to default
+                        start_date = datetime.utcnow()
                 since = int(start_date.timestamp() * 1000)
-                params["since"] = since
             else:
-                params["since"] = 0
+                since = 0
+
+            params["since"] = since
 
         return params
 
