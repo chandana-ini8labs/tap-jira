@@ -3323,7 +3323,7 @@ class TeamsStream(JiraStream):
     def url_base(self) -> str:
         """Return Teams API base URL."""
         domain = self.config["domain"]
-        return f"https://{domain}.atlassian.net"
+        return f"https://{domain}"
 
     def parse_response(self, response):
         for record in response.json():
@@ -3351,9 +3351,6 @@ class TeamMembersStream(JiraStream):
 
     schema = PropertiesList(
         Property("accountId", StringType),
-        Property("displayName", StringType),
-        Property("email", StringType),
-        Property("role", StringType),
         Property("team_id", StringType),
         Property("org_id", StringType),
     ).to_dict()
@@ -3362,7 +3359,7 @@ class TeamMembersStream(JiraStream):
     def url_base(self) -> str:
         """Return Teams API base URL."""
         domain = self.config["domain"]
-        return f"https://{domain}.atlassian.net"
+        return f"https://{domain}"
 
     def get_child_context(self, record, context):
         return {"team_id": record["id"]}
