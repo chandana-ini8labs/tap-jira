@@ -88,6 +88,12 @@ class TapJira(Tap):
             description="Include the audit logs stream",
             default=False,
         ),
+        th.Property(
+            "org_id",
+            th.StringType,
+            description="The organization ID for your Jira account.",
+            required=False,
+        ),
     ).to_dict()
 
     def discover_streams(self) -> list[streams.JiraStream]:
@@ -127,6 +133,8 @@ class TapJira(Tap):
             streams.IssueWatchersStream(self),
             streams.IssueWorklogs(self),
             streams.DeletedWorklogs(self),
+            streams.TeamsStream(self),
+            streams.TeamMembersStream(self),
         ]
 
         if self.config.get("include_audit_logs", False):

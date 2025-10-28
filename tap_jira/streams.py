@@ -3299,3 +3299,99 @@ class DeletedWorklogs(JiraStream):
         if data.get("lastPage") is False and "nextPage" in data:
             return data["nextPage"]
         return None
+
+
+class TeamsStream(JiraStream):
+    """Teams Stream."""
+
+    name = "teams"
+    path = "/gateway/api/public/teams/v1/org/{org_id}/teams"
+    primary_keys = ("id",)
+    records_jsonpath = "$[*]"
+    next_page_token_jsonpath = None
+
+    schema = PropertiesList(
+        Property("teamId", StringType),
+        Property("organizationId", StringType),
+        Property("displayName", StringType),
+        Property("description", StringType),
+        Property("teamType", StringType),
+        Property("creatorId", StringType),
+    ).to_dict()
+
+    @property
+    def url_base(self) -> str:
+        """Return Teams API base URL."""
+        domain = self.config["domain"]
+        return f"https://{domain}.atlassian.net"
+
+    def parse_response(self, response):
+        for record in response.json():
+            record["org_id"] = self.config.get("org_id")
+            yield record
+
+    def get_child_context(
+        self, record: dict, context: dict | None
+    ) -> dict:  # noqa: ARG002
+        """Return a context dictionary for child streams."""
+        return {"team_id": record["teamId"]}
+
+
+class TeamMembersStream(JiraStream):
+    """Team Members Stream.
+    Fetches members for each team using POST request.
+    """
+
+    name = "team_members"
+    parent_stream_type = TeamsStream
+    path = "/gateway/api/public/teams/v1/org/{org_id}/teams/{team_id}/members"
+    primary_keys = ("accountId", "team_id")
+    records_jsonpath = "$.members[*]"
+    next_page_token_jsonpath = None
+
+    schema = PropertiesList(
+        Property("accountId", StringType),
+        Property("displayName", StringType),
+        Property("email", StringType),
+        Property("role", StringType),
+        Property("team_id", StringType),
+        Property("org_id", StringType),
+    ).to_dict()
+
+    @property
+    def url_base(self) -> str:
+        """Return Teams API base URL."""
+        domain = self.config["domain"]
+        return f"https://{domain}.atlassian.net"
+
+    def get_child_context(self, record, context):
+        return {"team_id": record["id"]}
+
+    def get_url(self, context):
+        org_id = self.config.get("org_id")
+        team_id = context["team_id"]
+        return f"{self.url_base}/gateway/api/public/teams/v1/org/{org_id}/teams/{team_id}/members"
+
+    def request_body_json(self, context):
+        """Return POST body."""
+        return {"first": 50}
+
+    def request_records(self, context):
+        """Override to send POST instead of GET."""
+        response = self.request_api("POST", context)
+        yield from self.parse_response(response)
+
+    def request_api(self, method, context):
+        url = self.get_url(context)
+        headers = self.http_headers
+        body = self.request_body_json(context)
+        resp = self._request(method, url, headers=headers, json=body)
+        resp.raise_for_status()
+        return resp
+
+    def parse_response(self, response):
+        data = response.json()
+        for member in data.get("members", []):
+            member["team_id"] = response.request.url.split("/teams/")[1].split("/")[0]
+            member["org_id"] = self.config.get("org_id")
+            yield member
