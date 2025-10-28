@@ -3326,7 +3326,11 @@ class TeamsStream(JiraStream):
         return f"https://{domain}"
 
     def parse_response(self, response):
-        for record in response.json():
+        """Parse the JSON response correctly from 'entities' key."""
+        data = response.json()
+        records = data.get("entities", [])
+
+        for record in records:
             record["org_id"] = self.config.get("org_id")
             yield record
 
@@ -3388,7 +3392,7 @@ class TeamMembersStream(JiraStream):
 
     def parse_response(self, response):
         data = response.json()
-        for member in data.get("members", []):
+        for member in data.get("results", []):  # <- changed from "members" to "results"
             member["team_id"] = response.request.url.split("/teams/")[1].split("/")[0]
             member["org_id"] = self.config.get("org_id")
             yield member
