@@ -3365,7 +3365,7 @@ class TeamMembersStream(JiraStream):
         return f"https://{domain}"
 
     def get_child_context(self, record, context):
-        return {"team_id": record["id"]}
+        return {"team_id": record["teamId"]}
 
     def get_url(self, context):
         org_id = self.config.get("org_id")
