@@ -3350,7 +3350,7 @@ class TeamMembersStream(JiraStream):
     parent_stream_type = TeamsStream
     path = "/gateway/api/public/teams/v1/org/{org_id}/teams/{team_id}/members"
     primary_keys = ("accountId", "team_id")
-    records_jsonpath = "$.results[*]"  # Adjust if actual key differs
+    records_jsonpath = "$.results[*]"
     next_page_token_jsonpath = None
 
     schema = PropertiesList(
@@ -3377,24 +3377,29 @@ class TeamMembersStream(JiraStream):
         return {"first": 50}
 
     def request_records(self, context):
-        """Send POST request using SDK request() helper (keeps auth, retries, etc.)."""
+        """Send POST request with correct authentication headers."""
         url = self.get_url(context)
         body = self.request_body_json(context)
 
-        # ✅ use the SDK's request() which automatically attaches authentication headers
-        response = self.request(
-            method="POST",
-            url=url,
+        # ✅ Properly use the session with auth headers
+        auth = self.authenticator
+        headers = auth.auth_headers or {}
+        headers["Accept"] = "application/json"
+        headers["Content-Type"] = "application/json"
+
+        response = self.requests_session.request(
+            "POST",
+            url,
+            headers=headers,
             json=body,
-            context=context,
         )
+        response.raise_for_status()
 
         yield from self.parse_response(response)
 
     def parse_response(self, response):
-        """Parse response and enrich each record with org_id and team_id."""
+        """Parse response and enrich with org_id and team_id."""
         data = response.json()
-        # Extract team_id from URL (since context not available here)
         try:
             team_id = response.request.url.split("/teams/")[1].split("/")[0]
         except Exception:
