@@ -3306,7 +3306,7 @@ class TeamsStream(JiraStream):
 
     name = "teams"
     path = "/gateway/api/public/teams/v1/org/{org_id}/teams"
-    primary_keys = ("id",)
+    primary_keys = ("teamId",)
     records_jsonpath = "$[*]"
     next_page_token_jsonpath = None
 
@@ -3363,9 +3363,6 @@ class TeamMembersStream(JiraStream):
     def url_base(self) -> str:
         domain = self.config["domain"]
         return f"https://{domain}"
-
-    def get_child_context(self, record, context):
-        return {"team_id": record["teamId"]}
 
     def get_url(self, context):
         org_id = self.config.get("org_id")
