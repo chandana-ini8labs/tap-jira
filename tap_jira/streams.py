@@ -3381,17 +3381,15 @@ class TeamMembersStream(JiraStream):
         url = self.get_url(context)
         body = self.request_body_json(context)
 
-        # ✅ Properly use the session with auth headers
-        auth = self.authenticator
-        headers = auth.auth_headers or {}
-        headers["Accept"] = "application/json"
-        headers["Content-Type"] = "application/json"
+        # ✅ Use authenticator directly with auth parameter
+        headers = {"Accept": "application/json", "Content-Type": "application/json"}
 
         response = self.requests_session.request(
             "POST",
             url,
             headers=headers,
             json=body,
+            auth=self.authenticator,  # Pass authenticator to auth parameter
         )
         response.raise_for_status()
 
