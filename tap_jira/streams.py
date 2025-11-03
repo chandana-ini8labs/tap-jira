@@ -3301,46 +3301,6 @@ class DeletedWorklogs(JiraStream):
         return None
 
 
-class TeamsStream(JiraStream):
-    """Teams Stream."""
-
-    name = "teams"
-    path = "/gateway/api/public/teams/v1/org/{org_id}/teams"
-    primary_keys = ("teamId",)
-    records_jsonpath = "$[*]"
-    next_page_token_jsonpath = None
-
-    schema = PropertiesList(
-        Property("teamId", StringType),
-        Property("organizationId", StringType),
-        Property("displayName", StringType),
-        Property("description", StringType),
-        Property("teamType", StringType),
-        Property("creatorId", StringType),
-    ).to_dict()
-
-    @property
-    def url_base(self) -> str:
-        """Return Teams API base URL."""
-        domain = self.config["domain"]
-        return f"https://{domain}"
-
-    def parse_response(self, response):
-        """Parse the JSON response correctly from 'entities' key."""
-        data = response.json()
-        records = data.get("entities", [])
-
-        for record in records:
-            record["org_id"] = self.config.get("org_id")
-            yield record
-
-    def get_child_context(
-        self, record: dict, context: dict | None
-    ) -> dict:  # noqa: ARG002
-        """Return a context dictionary for child streams."""
-        return {"team_id": record["teamId"]}
-
-
 class TeamMembersStream(JiraStream):
     """Team Members Stream.
     Fetches members for each team using POST request.
@@ -3364,6 +3324,10 @@ class TeamMembersStream(JiraStream):
         domain = self.config["domain"]
         return f"https://{domain}"
 
+    def get_next_page_token(self, response, previous_token):
+        """No pagination for Team Members API - return None."""
+        return None
+
     def get_url(self, context):
         org_id = self.config.get("org_id")
         team_id = context["team_id"]
@@ -3378,27 +3342,22 @@ class TeamMembersStream(JiraStream):
         url = self.get_url(context)
         body = self.request_body_json(context)
 
-        # ✅ Use authenticator directly with auth parameter
         headers = {"Accept": "application/json", "Content-Type": "application/json"}
 
         response = self.requests_session.request(
-            "POST",
-            url,
-            headers=headers,
-            json=body,
-            auth=self.authenticator,  # Pass authenticator to auth parameter
+            "POST", url, headers=headers, json=body, auth=self.authenticator
         )
         response.raise_for_status()
 
-        yield from self.parse_response(response)
+        # Pass context to parse_response
+        yield from self.parse_response(response, context)
 
-    def parse_response(self, response):
+    def parse_response(self, response, context=None):
         """Parse response and enrich with org_id and team_id."""
         data = response.json()
-        try:
-            team_id = response.request.url.split("/teams/")[1].split("/")[0]
-        except Exception:
-            team_id = None
+
+        # Get team_id from context (most reliable)
+        team_id = context.get("team_id") if context else None
 
         for member in data.get("results", []):
             member["team_id"] = team_id
