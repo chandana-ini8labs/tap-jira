@@ -3350,7 +3350,7 @@ class TeamMembersStream(JiraStream):
     parent_stream_type = TeamsStream
     path = "/gateway/api/public/teams/v1/org/{org_id}/teams/{team_id}/members"
     primary_keys = ("accountId", "team_id")
-    records_jsonpath = "$.results[*]"  # Use "results" if that's the real response key
+    records_jsonpath = "$.results[*]"  # Adjust if actual key differs
     next_page_token_jsonpath = None
 
     schema = PropertiesList(
@@ -3377,25 +3377,30 @@ class TeamMembersStream(JiraStream):
         return {"first": 50}
 
     def request_records(self, context):
-        """Override to send POST instead of GET."""
+        """Send POST request using SDK request() helper (keeps auth, retries, etc.)."""
         url = self.get_url(context)
-        headers = self.http_headers
         body = self.request_body_json(context)
 
-        # ✅ Use requests_session directly
-        response = self.requests_session.request(
+        # ✅ use the SDK's request() which automatically attaches authentication headers
+        response = self.request(
             method="POST",
             url=url,
-            headers=headers,
             json=body,
+            context=context,
         )
-        response.raise_for_status()
 
         yield from self.parse_response(response)
 
     def parse_response(self, response):
+        """Parse response and enrich each record with org_id and team_id."""
         data = response.json()
+        # Extract team_id from URL (since context not available here)
+        try:
+            team_id = response.request.url.split("/teams/")[1].split("/")[0]
+        except Exception:
+            team_id = None
+
         for member in data.get("results", []):
-            member["team_id"] = response.request.url.split("/teams/")[1].split("/")[0]
+            member["team_id"] = team_id
             member["org_id"] = self.config.get("org_id")
             yield member
