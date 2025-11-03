@@ -3350,7 +3350,7 @@ class TeamMembersStream(JiraStream):
     parent_stream_type = TeamsStream
     path = "/gateway/api/public/teams/v1/org/{org_id}/teams/{team_id}/members"
     primary_keys = ("accountId", "team_id")
-    records_jsonpath = "$.members[*]"
+    records_jsonpath = "$.results[*]"  # Use "results" if that's the real response key
     next_page_token_jsonpath = None
 
     schema = PropertiesList(
@@ -3361,7 +3361,6 @@ class TeamMembersStream(JiraStream):
 
     @property
     def url_base(self) -> str:
-        """Return Teams API base URL."""
         domain = self.config["domain"]
         return f"https://{domain}"
 
@@ -3379,20 +3378,24 @@ class TeamMembersStream(JiraStream):
 
     def request_records(self, context):
         """Override to send POST instead of GET."""
-        response = self.request_api("POST", context)
-        yield from self.parse_response(response)
-
-    def request_api(self, method, context):
         url = self.get_url(context)
         headers = self.http_headers
         body = self.request_body_json(context)
-        resp = self._request(method, url, headers=headers, json=body)
-        resp.raise_for_status()
-        return resp
+
+        # ✅ Use requests_session directly
+        response = self.requests_session.request(
+            method="POST",
+            url=url,
+            headers=headers,
+            json=body,
+        )
+        response.raise_for_status()
+
+        yield from self.parse_response(response)
 
     def parse_response(self, response):
         data = response.json()
-        for member in data.get("results", []):  # <- changed from "members" to "results"
+        for member in data.get("results", []):
             member["team_id"] = response.request.url.split("/teams/")[1].split("/")[0]
             member["org_id"] = self.config.get("org_id")
             yield member
