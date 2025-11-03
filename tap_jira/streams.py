@@ -3301,6 +3301,48 @@ class DeletedWorklogs(JiraStream):
         return None
 
 
+class TeamsStream(JiraStream):
+    """Teams Stream."""
+
+    name = "teams"
+    path = "/gateway/api/public/teams/v1/org/{org_id}/teams"
+    primary_keys = ("teamId",)
+    records_jsonpath = "$[*]"
+    next_page_token_jsonpath = None
+
+    schema = PropertiesList(
+        Property("teamId", StringType),
+        Property("organizationId", StringType),
+        Property("displayName", StringType),
+        Property("description", StringType),
+        Property("teamType", StringType),
+        Property("creatorId", StringType),
+    ).to_dict()
+
+    @property
+    def url_base(self) -> str:
+        """Return Teams API base URL."""
+        domain = self.config["domain"]
+        return f"https://{domain}"
+
+    def get_next_page_token(self, response, previous_token):
+        """No pagination for Teams API - return None."""
+        return None
+
+    def parse_response(self, response):
+        """Parse the JSON response correctly from 'entities' key."""
+        data = response.json()
+        records = data.get("entities", [])
+
+        for record in records:
+            record["org_id"] = self.config.get("org_id")
+            yield record
+
+    def get_child_context(self, record: dict, context: dict | None) -> dict:
+        """Return a context dictionary for child streams."""
+        return {"team_id": record["teamId"]}
+
+
 class TeamMembersStream(JiraStream):
     """Team Members Stream.
     Fetches members for each team using POST request.
